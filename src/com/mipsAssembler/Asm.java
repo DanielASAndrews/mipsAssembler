@@ -26,13 +26,18 @@ public class Asm {
 
     private void run() {
         Scanner in = new Scanner(System.in);
+
+        ArrayList<String> numbersToPrint = new ArrayList<String>();
+
         while(in.hasNextLine()) {
             String line = in.nextLine();
 
+            numbersToPrint.add(line);
+
             for (int j=0; j < 2; ++j){
-                for (int i = 0; i < line.length(); ++i){
-                    char number = line.charAt(i);
-                    System.out.println(number + "\n");
+                for (int i = 0; i < numbersToPrint.size(); ++i){
+                    String number = numbersToPrint.get(i);
+                    System.out.println(number);
                 }
             }
           /*
