@@ -18,43 +18,56 @@ import java.math.*;
  * @version 071011.0
  */
 public class Asm {
-    public static final void main(String[] args) {
-        new Asm().run();
-    }
+        public static final void main(String[] args) {
+            new Asm().run();
+        }
 
-    private Lexer lexer = new Lexer();
+        private Lexer lexer = new Lexer();
 
-    private void run() {
-        Scanner in = new Scanner(System.in);
+        private void run() {
+            Scanner in = new Scanner(System.in);
 
-        ArrayList<String> numbersToPrint = new ArrayList<String>();
+            while(in.hasNextLine()) {
+                String line = in.nextLine();
 
-        while(in.hasNextLine()) {
-            String line = in.nextLine();
+                // Scan the line into an array of tokens.
+                Token[] tokens;
+                tokens = lexer.scan(line);
 
-            numbersToPrint.add(line);
+                // Print the tokens produced by the scanner
+                for( int i = 0; i < tokens.length; i++ ) {
+                    System.err.println("  Token: "+tokens[i]);
+                }
 
-            for (int j=0; j < 2; ++j){
-                for (int i = 0; i < numbersToPrint.size(); ++i){
-                    String number = numbersToPrint.get(i);
-                    System.out.println(number);
+                for( int i = 0; i < tokens.length; i++ ) {
+
+                    Token currentToken = tokens[i];
+
+                   if ((currentToken.kind == Kind.DOTWORD) && (tokens.length == 2))  {
+
+                       Token nextToken = tokens[i+1];
+
+                       if (nextToken.kind == Kind.INT || nextToken.kind == Kind.HEXINT){
+                           Token.outputByte(nextToken.toInt());
+                           i++;
+                       }
+                       else {
+                           System.err.format("ERROR: Need an integer after directive .word, problem token: %s", nextToken.lexeme);
+                           System.exit(1);
+                       }
+                   }
+                    else {
+                       System.err.format("ERROR: Expecting end of line, but there's more stuff, problem token: %s", currentToken.lexeme);
+                       System.exit(1);
+                   }
+
+
                 }
             }
-          /*
-            // Scan the line into an array of tokens.
-            Token[] tokens;
-            tokens = lexer.scan(line);
 
-            // Print the tokens produced by the scanner
-            for( int i = 0; i < tokens.length; i++ ) {
-                System.err.println("  Token: "+tokens[i]);
-            }
-
-            */
+            //System.out.flush();
         }
-        System.out.flush();
     }
-}
 
 /** The various kinds of tokens. */
 enum Kind {
@@ -75,6 +88,14 @@ class Token {
     public Kind kind;     // The kind of token.
     public String lexeme; // String representation of the actual token in the
     // source code.
+
+    public static void outputByte(int i){
+        System.err.write(i>>24);
+        System.err.write(i>>16);
+        System.err.write(i>>8);
+        System.err.write(i);
+        System.err.flush();
+    }
 
     public Token(Kind kind, String lexeme) {
         this.kind = kind;
