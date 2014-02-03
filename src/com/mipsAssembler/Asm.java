@@ -8,8 +8,8 @@ package com.mipsAssembler;
  * To change this template use File | Settings | File Templates.
  */
 
+import java.math.BigInteger;
 import java.util.*;
-import java.math.*;
 
 /** A sample main class demonstrating the use of the Lexer.
  * This main class just outputs each line in the input, followed by
@@ -17,15 +17,37 @@ import java.math.*;
  *
  * @version 071011.0
  */
+
+@SuppressWarnings("deprecation")
 public class Asm {
         public static final void main(String[] args) {
             new Asm().run();
         }
 
         private Lexer lexer = new Lexer();
+        HashMap symbolTable = new HashMap();
+
+        private void printSymbolTable(){
+
+            Iterator iterator = symbolTable.keySet().iterator();
+
+            while (iterator.hasNext()) {
+                String key = iterator.next().toString();
+                String value = symbolTable.get(key).toString();
+
+                //Remove the colon
+                String keyNoColon = key.substring(0,key.length()-1);
+
+                System.err.println(keyNoColon + " " + value);
+            }
+
+        }
 
         private void run() {
             Scanner in = new Scanner(System.in);
+
+            int currentMemoryAddress = 0;
+            final int byteIncrement = 4;
 
             while(in.hasNextLine()) {
                 String line = in.nextLine();
@@ -35,26 +57,59 @@ public class Asm {
                 tokens = lexer.scan(line);
 
                 // Print the tokens produced by the scanner
-                for( int i = 0; i < tokens.length; i++ ) {
+               /* for( int i = 0; i < tokens.length; i++ ) {
                     System.err.println("  Token: "+tokens[i]);
                 }
+
+                */
 
                 for( int i = 0; i < tokens.length; i++ ) {
 
                     Token currentToken = tokens[i];
 
-                   if ((currentToken.kind == Kind.DOTWORD) && (tokens.length == 2))  {
+
+                   if ((currentToken.kind == Kind.DOTWORD) && (tokens.length > 1))  {
 
                        Token nextToken = tokens[i+1];
 
                        if (nextToken.kind == Kind.INT || nextToken.kind == Kind.HEXINT){
                            Token.outputByte(nextToken.toInt());
                            i++;
+                           currentMemoryAddress += byteIncrement;
+                         //  System.out.format("currentMemoryAddress: %d", currentMemoryAddress);
                        }
                        else {
                            System.err.format("ERROR: Need an integer after directive .word, problem token: %s", nextToken.lexeme);
                            System.exit(1);
                        }
+                   }
+                   else if(currentToken.kind == Kind.LABEL)  {
+
+                       if (tokens.length > 1 & i!= 0) {
+
+                           Token previousToken = tokens[i-1];
+
+                           if (previousToken.kind != Kind.LABEL) {
+
+                               System.err.format("ERROR: label cannot have a non-label preceding it: %s", previousToken.lexeme);
+                               System.exit(1);
+
+                           }
+
+                       }
+
+                       boolean keyExists = symbolTable.containsKey(currentToken.lexeme);
+
+                       if(!keyExists){
+                           symbolTable.put(currentToken.lexeme, currentMemoryAddress);
+                       }
+                       else {
+                           System.err.format("ERROR: Duplicate Label: %s", currentToken.lexeme);
+                           System.exit(1);
+                       }
+
+                       //System.out.format("currentMemoryAddress: %d", currentMemoryAddress);
+
                    }
                     else {
                        System.err.format("ERROR: Expecting end of line, but there's more stuff, problem token: %s", currentToken.lexeme);
@@ -63,9 +118,10 @@ public class Asm {
 
 
                 }
+
             }
 
-            //System.out.flush();
+            printSymbolTable();
         }
     }
 
@@ -90,11 +146,11 @@ class Token {
     // source code.
 
     public static void outputByte(int i){
-        System.err.write(i>>24);
-        System.err.write(i>>16);
-        System.err.write(i>>8);
-        System.err.write(i);
-        System.err.flush();
+        System.out.write(i>>24);
+        System.out.write(i>>16);
+        System.out.write(i>>8);
+        System.out.write(i);
+        System.out.flush();
     }
 
     public Token(Kind kind, String lexeme) {
