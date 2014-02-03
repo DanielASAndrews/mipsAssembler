@@ -25,11 +25,13 @@ public class Asm {
         }
 
         private Lexer lexer = new Lexer();
-        HashMap symbolTable = new HashMap();
+        private Map<String, Integer> symbolTable = new HashMap<String, Integer>();
 
         private void printSymbolTable(){
 
             Iterator iterator = symbolTable.keySet().iterator();
+
+            System.out.println();
 
             while (iterator.hasNext()) {
                 String key = iterator.next().toString();
@@ -37,17 +39,111 @@ public class Asm {
 
                 //Remove the colon
                 String keyNoColon = key.substring(0,key.length()-1);
-
-                System.err.println(keyNoColon + " " + value);
+                System.out.println(keyNoColon + " " + value);
             }
 
+            System.out.println();
+
+        }
+
+        private void firstPass (ArrayList<Token[]> tokenLines){
+            int currentMemoryAddress = 0;
+            final int byteIncrement = 4;
+
+            for (Token[] tokenLine : tokenLines) {
+
+                for( int i = 0; i < tokenLine.length; i++ ) {
+
+                    Token currentToken = tokenLine[i];
+
+                    if ((currentToken.kind == Kind.DOTWORD) && (tokenLine.length > 1))  {
+
+                        Token nextToken = tokenLine[i+1];
+
+                        if (nextToken.kind == Kind.INT || nextToken.kind == Kind.HEXINT){
+                            i++;
+                            currentMemoryAddress += byteIncrement;
+                            //  System.out.format("currentMemoryAddress: %d", currentMemoryAddress);
+                        }
+                        else if (nextToken.kind == Kind.ID){
+                            i++;
+                            currentMemoryAddress += byteIncrement;
+                        }
+                        else {
+                            System.err.format("ERROR: Need an integer or label after directive .word, problem token: %s", nextToken.lexeme);
+                            System.exit(1);
+                        }
+                    }
+                    else if(currentToken.kind == Kind.LABEL)  {
+                        if (tokenLine.length > 1 & i!= 0) {
+
+                            Token previousToken = tokenLine[i-1];
+
+                            if (previousToken.kind != Kind.LABEL) {
+                                System.err.format("ERROR: label cannot have a non-label preceding it: %s", previousToken.lexeme);
+                                System.exit(1);
+                            }
+                        }
+                        boolean keyExists = symbolTable.containsKey(currentToken.lexeme);
+
+                        if(!keyExists){
+                            symbolTable.put(currentToken.lexeme, currentMemoryAddress);
+                        }
+                        else {
+                            System.err.format("ERROR: Duplicate Label: %s", currentToken.lexeme);
+                            System.exit(1);
+                        }
+                    }
+                    else {
+                        System.err.format("ERROR: Expecting end of line, but there's more stuff, problem token: %s", currentToken.lexeme);
+                        System.exit(1);
+                    }
+                }
+            }
+        }
+
+        private void secondPass (ArrayList<Token[]> tokenLines){
+
+            for (Token[] tokenLine : tokenLines) {
+
+                for( int i = 0; i < tokenLine.length; i++ ) {
+
+                    Token currentToken = tokenLine[i];
+
+                    if ((currentToken.kind == Kind.DOTWORD) && (tokenLine.length > 1))  {
+
+                        Token nextToken = tokenLine[i+1];
+
+                        if (nextToken.kind == Kind.INT || nextToken.kind == Kind.HEXINT){
+                            Token.outputByte(nextToken.toInt());
+                            i++;
+                            //  System.out.format("currentMemoryAddress: %d", currentMemoryAddress);
+                        }
+                        else if (nextToken.kind == Kind.ID){
+
+                            boolean labelIsDefined = symbolTable.containsKey(nextToken.lexeme + ":");
+
+                            if (!labelIsDefined){
+                                System.err.format("ERROR: label not defined: %s", nextToken.lexeme);
+                                System.exit(1);
+                            }
+
+                            int labelAddress = symbolTable.get(nextToken.lexeme + ":");
+
+                            Token.outputByte(labelAddress);
+                            i++;
+                        }
+
+                    }
+
+                }
+            }
         }
 
         private void run() {
             Scanner in = new Scanner(System.in);
 
-            int currentMemoryAddress = 0;
-            final int byteIncrement = 4;
+            ArrayList<Token[]> tokenLines = new ArrayList<Token[]>();
 
             while(in.hasNextLine()) {
                 String line = in.nextLine();
@@ -56,72 +152,15 @@ public class Asm {
                 Token[] tokens;
                 tokens = lexer.scan(line);
 
-                // Print the tokens produced by the scanner
-               /* for( int i = 0; i < tokens.length; i++ ) {
-                    System.err.println("  Token: "+tokens[i]);
-                }
-
-                */
-
-                for( int i = 0; i < tokens.length; i++ ) {
-
-                    Token currentToken = tokens[i];
-
-
-                   if ((currentToken.kind == Kind.DOTWORD) && (tokens.length > 1))  {
-
-                       Token nextToken = tokens[i+1];
-
-                       if (nextToken.kind == Kind.INT || nextToken.kind == Kind.HEXINT){
-                           Token.outputByte(nextToken.toInt());
-                           i++;
-                           currentMemoryAddress += byteIncrement;
-                         //  System.out.format("currentMemoryAddress: %d", currentMemoryAddress);
-                       }
-                       else {
-                           System.err.format("ERROR: Need an integer after directive .word, problem token: %s", nextToken.lexeme);
-                           System.exit(1);
-                       }
-                   }
-                   else if(currentToken.kind == Kind.LABEL)  {
-
-                       if (tokens.length > 1 & i!= 0) {
-
-                           Token previousToken = tokens[i-1];
-
-                           if (previousToken.kind != Kind.LABEL) {
-
-                               System.err.format("ERROR: label cannot have a non-label preceding it: %s", previousToken.lexeme);
-                               System.exit(1);
-
-                           }
-
-                       }
-
-                       boolean keyExists = symbolTable.containsKey(currentToken.lexeme);
-
-                       if(!keyExists){
-                           symbolTable.put(currentToken.lexeme, currentMemoryAddress);
-                       }
-                       else {
-                           System.err.format("ERROR: Duplicate Label: %s", currentToken.lexeme);
-                           System.exit(1);
-                       }
-
-                       //System.out.format("currentMemoryAddress: %d", currentMemoryAddress);
-
-                   }
-                    else {
-                       System.err.format("ERROR: Expecting end of line, but there's more stuff, problem token: %s", currentToken.lexeme);
-                       System.exit(1);
-                   }
-
-
-                }
-
+                tokenLines.add(tokens);
             }
 
-            printSymbolTable();
+            firstPass(tokenLines);
+
+            //printSymbolTable();
+
+            secondPass (tokenLines);
+
         }
     }
 
